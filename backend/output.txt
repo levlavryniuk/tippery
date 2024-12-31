@@ -1,0 +1,1924 @@
+
+ File path: ./package.json 
+ 
+{
+  "name": "backend",
+  "version": "0.0.1",
+  "description": "",
+  "author": "",
+  "private": true,
+  "license": "UNLICENSED",
+  "scripts": {
+    "build": "nest build",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "start": "nest start",
+    "start:dev": "nest start --watch",
+    "dev": "nest start --watch",
+    "start:debug": "nest start --debug --watch",
+    "start:prod": "node dist/main",
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:cov": "jest --coverage",
+    "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "drizzle": "bun drizzle-kit"
+  },
+  "dependencies": {
+    "@knaadh/nestjs-drizzle-postgres": "^1.2.0",
+    "@neondatabase/serverless": "^0.10.4",
+    "@nestjs/common": "^10.0.0",
+    "@nestjs/config": "^3.3.0",
+    "@nestjs/core": "^10.0.0",
+    "@nestjs/jwt": "^10.2.0",
+    "@nestjs/mapped-types": "*",
+    "@nestjs/passport": "^10.0.3",
+    "@nestjs/platform-fastify": "^10.4.15",
+    "@types/passport-jwt": "^4.0.1",
+    "bcrypt": "^5.1.1",
+    "class-validator": "^0.14.1",
+    "dotenv": "^16.4.7",
+    "drizzle-orm": "^0.38.3",
+    "passport": "^0.7.0",
+    "passport-jwt": "^4.0.1",
+    "reflect-metadata": "^0.2.0",
+    "rxjs": "^7.8.1"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^10.0.0",
+    "@nestjs/schematics": "^10.0.0",
+    "@nestjs/testing": "^10.0.0",
+    "@types/bcrypt": "^5.0.2",
+    "@types/express": "^5.0.0",
+    "@types/jest": "^29.5.2",
+    "@types/node": "^20.3.1",
+    "@types/supertest": "^6.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "drizzle-kit": "^0.30.1",
+    "eslint": "^8.0.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-prettier": "^5.0.0",
+    "jest": "^29.5.0",
+    "prettier": "^3.0.0",
+    "source-map-support": "^0.5.21",
+    "supertest": "^7.0.0",
+    "ts-jest": "^29.1.0",
+    "ts-loader": "^9.4.3",
+    "ts-node": "^10.9.1",
+    "tsconfig-paths": "^4.2.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.1.3"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
+    "rootDir": "src",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": {
+      "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "collectCoverageFrom": [
+      "**/*.(t|j)s"
+    ],
+    "coverageDirectory": "../coverage",
+    "testEnvironment": "node"
+  }
+}
+
+ File path: ./tsconfig.json 
+ 
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2021",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "incremental": true,
+    "skipLibCheck": true,
+    "strictNullChecks": false,
+    "noImplicitAny": false,
+    "strictBindCallApply": false,
+    "forceConsistentCasingInFileNames": false,
+    "noFallthroughCasesInSwitch": false
+  }
+}
+
+ File path: ./src/app.module.ts 
+ 
+import { Module } from '@nestjs/common';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+import { config } from 'dotenv';
+import { DatabaseModule } from './db/database.module';
+import { DrizzleService } from './db/database.service';
+import { UsersModule } from './modules/users/users.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { JarsModule } from './modules/jars/jars.module';
+import { DonationsModule } from './modules/donations/donations.module';
+config();
+@Module({
+  imports: [
+    DatabaseModule,
+    UsersModule,
+    AuthModule,
+    JarsModule,
+    DonationsModule,
+  ],
+  controllers: [AppController],
+  providers: [AppService, DrizzleService],
+})
+export class AppModule {}
+
+ File path: ./src/db/database.service.ts 
+ 
+import { Inject, Injectable } from '@nestjs/common';
+import { Db, DB_KEY } from 'src/shared';
+
+@Injectable()
+export class DrizzleService {
+  constructor(@Inject(DB_KEY) readonly db: Db) {}
+}
+
+ File path: ./src/db/schema/index.ts 
+ 
+export * from './users';
+export * from './donations';
+export * from './jars';
+export * from './refresh-tokens';
+
+ File path: ./src/db/schema/donations.ts 
+ 
+import {
+  pgTable,
+  varchar,
+  numeric,
+  text,
+  timestamp,
+  boolean,
+  jsonb,
+  integer,
+  pgEnum,
+} from 'drizzle-orm/pg-core';
+import { jars } from './jars';
+import { timestamps } from './helpers';
+import { relations } from 'drizzle-orm';
+import { users } from './users';
+
+export const paymentMethod = pgEnum('paymentMethod', ['stripe', 'paypal']);
+
+export const donations = pgTable('donations', {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  jarId: varchar({ length: 256 }).notNull(),
+  userId: varchar({ length: 256 }),
+  amount: numeric({ precision: 10, scale: 2 }).notNull(),
+  currency: varchar({ length: 3 }).default('USD').notNull(),
+
+  transactionId: varchar({ length: 255 }).notNull(),
+  paymentMethod: paymentMethod().notNull(),
+
+  note: text(),
+  isRefunded: boolean().default(false).notNull(),
+  metadata: jsonb().default({}),
+
+  refundedAt: timestamp(),
+  ...timestamps,
+});
+
+export const donationsRelations = relations(donations, ({ one }) => ({
+  jar: one(jars, {
+    fields: [donations.jarId],
+    references: [jars.id],
+  }),
+  user: one(users, {
+    fields: [donations.userId],
+    references: [users.id],
+  }),
+}));
+
+export type DonationInsert = typeof donations.$inferInsert;
+export type DonationSelect = typeof donations.$inferSelect;
+
+ File path: ./src/db/schema/refresh-tokens.ts 
+ 
+import {
+  varchar,
+  timestamp,
+  boolean,
+  integer,
+  pgTable,
+  index,
+} from 'drizzle-orm/pg-core';
+import { users } from './users';
+
+export const refreshTokens = pgTable(
+  'refresh_tokens',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    userId: integer()
+      .references(() => users.id)
+      .notNull(),
+    token: varchar({ length: 255 }).unique().notNull(),
+    expiresAt: timestamp('', { withTimezone: true }).notNull(),
+    revoked: boolean().default(false).notNull(),
+    revokedAt: timestamp(),
+    createdAt: timestamp().defaultNow().notNull(),
+  },
+  (t) => [index('token_idx').on(t.token)],
+);
+
+ File path: ./src/db/schema/users.ts 
+ 
+import { integer, pgTable, text } from 'drizzle-orm/pg-core';
+import { timestamps } from './helpers';
+import { relations } from 'drizzle-orm';
+import { refreshTokens } from './refresh-tokens';
+
+const users = pgTable('users', {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  email: text().notNull().unique(),
+  username: text().notNull().unique(),
+  password: text().notNull(),
+  ...timestamps,
+});
+
+export const usersRelations = relations(users, ({ many }) => ({
+  refreshTokens: many(refreshTokens),
+}));
+
+export type UserSelect = typeof users.$inferSelect;
+export type UserInsert = typeof users.$inferInsert;
+
+export { users };
+
+ File path: ./src/db/schema/helpers.ts 
+ 
+import { timestamp } from 'drizzle-orm/pg-core';
+
+export const timestamps = {
+  createdAt: timestamp().defaultNow(),
+  updatedAt: timestamp(),
+};
+
+ File path: ./src/db/schema/jars.ts 
+ 
+import {
+  pgTable,
+  varchar,
+  numeric,
+  text,
+  integer,
+  boolean,
+  jsonb,
+} from 'drizzle-orm/pg-core';
+import { timestamps } from './helpers';
+import { relations } from 'drizzle-orm';
+import { donations } from './donations';
+
+export const jars = pgTable('jars', {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  ownerId: varchar({ length: 255 }).notNull(),
+  title: varchar({ length: 255 }).notNull(),
+  description: text(),
+
+  minimalPrice: numeric({ precision: 10, scale: 2 }).notNull(),
+  totalAmount: numeric({ precision: 15, scale: 2 }).notNull().default('0'),
+  totalDonations: integer().default(0).notNull(),
+  currency: varchar({ length: 3 }).default('USD').notNull(),
+
+  isActive: boolean().default(true).notNull(),
+  metadata: jsonb().default({}),
+
+  ...timestamps,
+});
+
+export const jarsRelations = relations(jars, ({ many }) => ({
+  donations: many(donations),
+}));
+
+export type JarInsert = typeof jars.$inferInsert;
+export type JarSelect = typeof jars.$inferSelect;
+
+ File path: ./src/db/database.module.ts 
+ 
+import { Module } from '@nestjs/common';
+import { drizzle } from 'drizzle-orm/neon-http';
+import { neon } from '@neondatabase/serverless';
+import * as schema from './schema';
+import { ConfigService } from '@nestjs/config';
+import { DB_KEY } from 'src/shared';
+
+@Module({
+  providers: [
+    ConfigService,
+    {
+      provide: DB_KEY,
+      inject: [ConfigService],
+      useFactory: async (config: ConfigService) => {
+        const url = config.get('DATABASE_URL');
+        const sql = neon(url);
+        const db = drizzle(sql, { schema });
+        return db;
+      },
+    },
+  ],
+  exports: [DB_KEY, ConfigService],
+})
+export class DatabaseModule {}
+
+ File path: ./src/app.controller.ts 
+ 
+import { Controller, Get } from '@nestjs/common';
+import { AppService } from './app.service';
+
+@Controller()
+export class AppController {
+  constructor(private readonly appService: AppService) {}
+
+  @Get()
+  getHello() {
+    return this.appService.getHello();
+  }
+}
+
+ File path: ./src/main.ts 
+ 
+import { NestFactory } from '@nestjs/core';
+import {
+  FastifyAdapter,
+  NestFastifyApplication,
+} from '@nestjs/platform-fastify';
+import { AppModule } from './app.module';
+
+async function bootstrap() {
+  const app = await NestFactory.create<NestFastifyApplication>(
+    AppModule,
+    new FastifyAdapter(),
+  );
+  await app.listen(process.env.PORT ?? 8000);
+}
+bootstrap();
+
+ File path: ./src/modules/donations/donations.module.ts 
+ 
+import { Module } from '@nestjs/common';
+import { DonationsService } from './donations.service';
+import { DonationsController } from './donations.controller';
+import { DatabaseModule } from 'src/db/database.module';
+import { DrizzleService } from 'src/db/database.service';
+
+@Module({
+  controllers: [DonationsController],
+  imports: [DatabaseModule],
+  providers: [DonationsService, DrizzleService],
+})
+export class DonationsModule {}
+
+ File path: ./src/modules/donations/donations.service.ts 
+ 
+import { Injectable } from '@nestjs/common';
+
+@Injectable()
+export class DonationsService {}
+
+ File path: ./src/modules/donations/donations.controller.ts 
+ 
+import { Controller } from '@nestjs/common';
+import { DonationsService } from './donations.service';
+
+@Controller('donations')
+export class DonationsController {
+  constructor(private readonly donationsService: DonationsService) {}
+}
+
+ File path: ./src/modules/jars/dto/create-jar.dto.ts 
+ 
+import { OmitType } from '@nestjs/mapped-types';
+import { IsOptional, IsString } from 'class-validator';
+
+export class CreateJarDto {
+  @IsString()
+  ownerId: string;
+
+  @IsString()
+  title: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsString()
+  minimalPrice: string;
+
+  @IsString()
+  currency: string;
+}
+
+export class CreateJarBodyDto extends OmitType(CreateJarDto, ['ownerId']) {}
+
+ File path: ./src/modules/jars/jars.module.ts 
+ 
+import { Module } from '@nestjs/common';
+import { JarsService } from './jars.service';
+import { JarsController } from './jars.controller';
+import { DatabaseModule } from 'src/db/database.module';
+import { DrizzleService } from 'src/db/database.service';
+
+@Module({
+  controllers: [JarsController],
+  imports: [DatabaseModule],
+  providers: [JarsService, DrizzleService],
+})
+export class JarsModule {}
+
+ File path: ./src/modules/jars/jars.service.ts 
+ 
+import { ConflictException, Injectable } from '@nestjs/common';
+import { DrizzleService } from 'src/db/database.service';
+import { CreateJarDto } from './dto/create-jar.dto';
+import { JarInsert, jars } from 'src/db/schema';
+import { and, eq } from 'drizzle-orm';
+
+@Injectable()
+export class JarsService {
+  constructor(private drizzle: DrizzleService) {}
+
+  async create(dto: CreateJarDto) {
+    const exists = !!(await this.drizzle.db.query.jars.findFirst({
+      where: and(eq(jars.id, +dto.ownerId), eq(jars.title, dto.title)),
+    }));
+
+    if (exists) {
+      return new ConflictException('Jar with this title already exists');
+    }
+
+    const jarInsert: JarInsert = dto;
+
+    await this.drizzle.db.insert(jars).values(jarInsert);
+  }
+  async get(jarId: number) {
+    return await this.drizzle.db.query.jars.findFirst({
+      where: eq(jars.id, jarId),
+      columns: {
+        title: true,
+        id: true,
+        description: true,
+        totalDonations: true,
+        ownerId: true,
+        currency: true,
+        minimalPrice: true,
+      },
+    });
+  }
+}
+
+ File path: ./src/modules/jars/jars.controller.ts 
+ 
+import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { JarsService } from './jars.service';
+import { GetUser } from '../auth/user.decorator';
+import { JwtPayload } from 'src/shared/jwt';
+import { CreateJarBodyDto, CreateJarDto } from './dto/create-jar.dto';
+import { JwtAuthGuard } from 'src/shared/guards';
+
+@Controller('jars')
+export class JarsController {
+  constructor(private readonly jarsService: JarsService) {}
+
+  @UseGuards(JwtAuthGuard)
+  @Post('/')
+  create(@GetUser() { sub }: JwtPayload, @Body() body: CreateJarBodyDto) {
+    const dto: CreateJarDto = {
+      ownerId: sub,
+      ...body,
+    };
+    return this.jarsService.create(dto);
+  }
+}
+
+ File path: ./src/modules/users/users.module.ts 
+ 
+import { Module } from '@nestjs/common';
+import { UsersService } from './users.service';
+import { UsersController } from './users.controller';
+import { DatabaseModule } from 'src/db/database.module';
+import { DrizzleService } from 'src/db/database.service';
+
+@Module({
+  controllers: [UsersController],
+  imports: [DatabaseModule],
+  providers: [UsersService, DrizzleService],
+})
+export class UsersModule {}
+
+ File path: ./src/modules/users/users.service.ts 
+ 
+import { Injectable } from '@nestjs/common';
+import { eq } from 'drizzle-orm';
+import { DrizzleService } from 'src/db/database.service';
+import { UserInsert, users } from 'src/db/schema';
+
+@Injectable()
+export class UsersService {
+  constructor(private drizzle: DrizzleService) {}
+
+  async create(user: UserInsert) {
+    return await this.drizzle.db.insert(users).values(user).returning();
+  }
+
+  async get(userId: string) {
+    return await this.drizzle.db.query.users.findFirst({
+      where: eq(users.id, +userId),
+    });
+  }
+
+  async update() {}
+}
+
+ File path: ./src/modules/users/users.controller.ts 
+ 
+import { Controller, Get, UseGuards } from '@nestjs/common';
+import { UsersService } from './users.service';
+import { JwtAuthGuard } from 'src/shared/guards';
+import { GetUser } from '../auth/user.decorator';
+import { JwtPayload } from 'src/shared/jwt';
+
+@Controller('users')
+export class UsersController {
+  constructor(private readonly usersService: UsersService) {}
+
+  @UseGuards(JwtAuthGuard)
+  @Get()
+  user(@GetUser() { sub }: JwtPayload) {
+    return this.usersService.get(sub);
+  }
+}
+
+ File path: ./src/modules/auth/dto/sign-in.dto.ts 
+ 
+export class SignInDto {
+  email: string;
+  password: string;
+}
+
+ File path: ./src/modules/auth/dto/refresh.dto.ts 
+ 
+export class RefreshDto {
+  refresh_token: string;
+}
+
+ File path: ./src/modules/auth/dto/sign-up.dto.ts 
+ 
+export class SignUpDto {
+  email: string;
+  password: string;
+  username: string;
+}
+
+ File path: ./src/modules/auth/user.decorator.ts 
+ 
+import { createParamDecorator, ExecutionContext } from '@nestjs/common';
+
+export const GetUser = createParamDecorator(
+  (_data: unknown, ctx: ExecutionContext) => {
+    const request = ctx.switchToHttp().getRequest();
+    return request.user;
+  },
+);
+
+ File path: ./src/modules/auth/auth.module.ts 
+ 
+import { Module } from '@nestjs/common';
+import { AuthService } from './auth.service';
+import { AuthController } from './auth.controller';
+import { DrizzleService } from 'src/db/database.service';
+import { UsersModule } from '../users/users.module';
+import { PassportModule } from '@nestjs/passport';
+import { JwtModule } from '@nestjs/jwt';
+import { JwtStrategy } from 'src/shared/jwt/jwt.strategy';
+import { DatabaseModule } from 'src/db/database.module';
+
+@Module({
+  controllers: [AuthController],
+  imports: [
+    UsersModule,
+    PassportModule,
+    JwtModule.register({
+      secret: process.env.JWT_SECRET,
+      global: true,
+    }),
+    DatabaseModule,
+  ],
+  providers: [AuthService, DrizzleService, JwtStrategy],
+  exports: [AuthService, JwtStrategy],
+})
+export class AuthModule {}
+
+ File path: ./src/modules/auth/auth.service.ts 
+ 
+import { SignInDto } from './dto/sign-in.dto';
+import { SignUpDto } from './dto/sign-up.dto';
+import { RefreshDto } from './dto/refresh.dto';
+import { DrizzleService } from 'src/db/database.service';
+import { eq, or } from 'drizzle-orm';
+import { UserInsert, users } from 'src/db/schema';
+import { JwtPayload } from 'src/shared/jwt';
+import * as bcrypt from 'bcrypt';
+import { JwtService } from '@nestjs/jwt';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+
+@Injectable()
+export class AuthService {
+  private readonly secret: string;
+  constructor(
+    private readonly drizzle: DrizzleService,
+    private readonly jwtService: JwtService,
+    configService: ConfigService,
+  ) {
+    this.secret = configService.getOrThrow('JWT_SECRET');
+  }
+
+  async signIn({ email, password }: SignInDto) {
+    const user = await this.drizzle.db.query.users.findFirst({
+      where: eq(users.email, email),
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    return await this.generateTokenPair({ sub: user.id.toString() });
+  }
+
+  async signUp({ email, username, password }: SignUpDto) {
+    const existingUser = await this.drizzle.db.query.users.findFirst({
+      where: or(eq(users.email, email), eq(users.username, username)),
+    });
+    if (existingUser) {
+      throw new ConflictException('User already exists');
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const values: UserInsert = {
+      email,
+      password: hashedPassword,
+      username,
+    };
+    const [newUser] = await this.drizzle.db
+      .insert(users)
+      .values(values)
+      .returning();
+
+    return await this.generateTokenPair({
+      sub: newUser.id.toString(),
+    });
+  }
+
+  async refresh({ refresh_token }: RefreshDto) {
+    try {
+      const decoded: JwtPayload = await this.jwtService.verifyAsync(
+        refresh_token,
+        {
+          secret: this.secret,
+        },
+      );
+      return await this.generateTokenPair({ sub: decoded.sub });
+    } catch {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+  }
+
+  async generateTokenPair(payload: JwtPayload) {
+    const [accessToken, refreshToken] = await Promise.all([
+      this.jwtService.signAsync(payload, {
+        expiresIn: '15m',
+        secret: this.secret,
+      }),
+      this.jwtService.signAsync(payload, {
+        expiresIn: '7d',
+        secret: this.secret,
+      }),
+    ]);
+
+    return {
+      accessToken,
+      refreshToken,
+    };
+  }
+}
+
+ File path: ./src/modules/auth/auth.controller.ts 
+ 
+import { Body, Controller, Post } from '@nestjs/common';
+import { AuthService } from './auth.service';
+import { SignInDto } from './dto/sign-in.dto';
+import { SignUpDto } from './dto/sign-up.dto';
+
+@Controller('auth')
+export class AuthController {
+  constructor(private readonly authService: AuthService) {}
+
+  @Post('sign-in')
+  signIn(@Body() dto: SignInDto) {
+    return this.authService.signIn(dto);
+  }
+
+  @Post('sign-up')
+  signUp(@Body() dto: SignUpDto) {
+    return this.authService.signUp(dto);
+  }
+}
+
+ File path: ./src/app.service.ts 
+ 
+import { Injectable } from '@nestjs/common';
+import { DrizzleService } from './db/database.service';
+
+@Injectable()
+export class AppService {
+  constructor(private drizzle: DrizzleService) {}
+
+  async getHello() {
+    return await this.drizzle.db.query.users.findMany();
+  }
+}
+
+ File path: ./src/shared/index.ts 
+ 
+export const DB_KEY = 'DATABASE_CONNECTION';
+import * as schema from '../db/schema';
+import { NeonHttpDatabase } from 'drizzle-orm/neon-http';
+
+export type Db = NeonHttpDatabase<typeof schema>;
+
+ File path: ./src/shared/guards/index.ts 
+ 
+export * from './jwt-auth-guard';
+
+ File path: ./src/shared/guards/jwt-auth-guard.ts 
+ 
+import { Injectable } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+
+@Injectable()
+export class JwtAuthGuard extends AuthGuard('jwt') {}
+
+ File path: ./src/shared/jwt/index.ts 
+ 
+export type JwtPayload = {
+  sub: string;
+};
+
+export type TokenPair = {
+  access_token: string;
+  refresh_token: string;
+};
+
+ File path: ./src/shared/jwt/jwt.strategy.ts 
+ 
+import { ExtractJwt, Strategy } from 'passport-jwt';
+import { PassportStrategy } from '@nestjs/passport';
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { JwtPayload } from '.';
+
+@Injectable()
+export class JwtStrategy extends PassportStrategy(Strategy) {
+  constructor(config: ConfigService) {
+    super({
+      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      ignoreExpiration: false,
+      secretOrKey: config.get('JWT_SECRET')!,
+    });
+  }
+
+  async validate(payload: JwtPayload) {
+    return { sub: payload.sub };
+  }
+}
+
+ File path: ./nest-cli.json 
+ 
+{
+  "$schema": "https://json.schemastore.org/nest-cli",
+  "collection": "@nestjs/schematics",
+  "sourceRoot": "src",
+  "compilerOptions": {
+    "deleteOutDir": true
+  }
+}
+
+ File path: ./drizzle.config.ts 
+ 
+import { defineConfig } from 'drizzle-kit';
+import * as dotenv from 'dotenv';
+
+dotenv.config();
+
+export default defineConfig({
+  dialect: 'postgresql',
+  schema: './src/db/schema',
+  out: './drizzle',
+  dbCredentials: {
+    url: process.env.DATABASE_URL!,
+  },
+});
+
+ File path: ./drizzle/meta/0001_snapshot.json 
+ 
+{
+  "id": "b73db9a1-2185-4b7e-98e0-6f5ac0090dc9",
+  "prevId": "e36e5be4-aa9d-43f6-a07a-b10b97f285b0",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.users": {
+      "name": "users",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "users_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "username": {
+          "name": "username",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "users_email_unique": {
+          "name": "users_email_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "email"
+          ]
+        },
+        "users_username_unique": {
+          "name": "users_username_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "username"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.refresh_tokens": {
+      "name": "refresh_tokens",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "refresh_tokens_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "userId": {
+          "name": "userId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token": {
+          "name": "token",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expiresAt": {
+          "name": "expiresAt",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "revoked": {
+          "name": "revoked",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "revokedAt": {
+          "name": "revokedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "token_idx": {
+          "name": "token_idx",
+          "columns": [
+            {
+              "expression": "token",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "refresh_tokens_userId_users_id_fk": {
+          "name": "refresh_tokens_userId_users_id_fk",
+          "tableFrom": "refresh_tokens",
+          "tableTo": "users",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "refresh_tokens_token_unique": {
+          "name": "refresh_tokens_token_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "token"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
+ File path: ./drizzle/meta/0002_snapshot.json 
+ 
+{
+  "id": "2f22a75b-5f12-455c-b535-918c309d71f3",
+  "prevId": "b73db9a1-2185-4b7e-98e0-6f5ac0090dc9",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.users": {
+      "name": "users",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "users_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "username": {
+          "name": "username",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "password": {
+          "name": "password",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "users_email_unique": {
+          "name": "users_email_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "email"
+          ]
+        },
+        "users_username_unique": {
+          "name": "users_username_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "username"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.refresh_tokens": {
+      "name": "refresh_tokens",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "refresh_tokens_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "userId": {
+          "name": "userId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token": {
+          "name": "token",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expiresAt": {
+          "name": "expiresAt",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "revoked": {
+          "name": "revoked",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "revokedAt": {
+          "name": "revokedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "token_idx": {
+          "name": "token_idx",
+          "columns": [
+            {
+              "expression": "token",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "refresh_tokens_userId_users_id_fk": {
+          "name": "refresh_tokens_userId_users_id_fk",
+          "tableFrom": "refresh_tokens",
+          "tableTo": "users",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "refresh_tokens_token_unique": {
+          "name": "refresh_tokens_token_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "token"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
+ File path: ./drizzle/meta/0003_snapshot.json 
+ 
+{
+  "id": "abb04797-b4ce-4563-9691-6ca32dd28ac4",
+  "prevId": "2f22a75b-5f12-455c-b535-918c309d71f3",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.donations": {
+      "name": "donations",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "donations_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "jarId": {
+          "name": "jarId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "userId": {
+          "name": "userId",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "amount": {
+          "name": "amount",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "currency": {
+          "name": "currency",
+          "type": "varchar(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'USD'"
+        },
+        "transactionId": {
+          "name": "transactionId",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "paymentMethod": {
+          "name": "paymentMethod",
+          "type": "paymentMethod",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "isRefunded": {
+          "name": "isRefunded",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'{}'::jsonb"
+        },
+        "refundedAt": {
+          "name": "refundedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.users": {
+      "name": "users",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "users_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "username": {
+          "name": "username",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "password": {
+          "name": "password",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "users_email_unique": {
+          "name": "users_email_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "email"
+          ]
+        },
+        "users_username_unique": {
+          "name": "users_username_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "username"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.jars": {
+      "name": "jars",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "jars_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "ownerId": {
+          "name": "ownerId",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "minimalPrice": {
+          "name": "minimalPrice",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "totalAmount": {
+          "name": "totalAmount",
+          "type": "numeric(15, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "totalDonations": {
+          "name": "totalDonations",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "currency": {
+          "name": "currency",
+          "type": "varchar(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'USD'"
+        },
+        "isActive": {
+          "name": "isActive",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'{}'::jsonb"
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.refresh_tokens": {
+      "name": "refresh_tokens",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "refresh_tokens_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "userId": {
+          "name": "userId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token": {
+          "name": "token",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expiresAt": {
+          "name": "expiresAt",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "revoked": {
+          "name": "revoked",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "revokedAt": {
+          "name": "revokedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "token_idx": {
+          "name": "token_idx",
+          "columns": [
+            {
+              "expression": "token",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "refresh_tokens_userId_users_id_fk": {
+          "name": "refresh_tokens_userId_users_id_fk",
+          "tableFrom": "refresh_tokens",
+          "tableTo": "users",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "refresh_tokens_token_unique": {
+          "name": "refresh_tokens_token_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "token"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
+ File path: ./drizzle/meta/_journal.json 
+ 
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1735590694974,
+      "tag": "0000_illegal_outlaw_kid",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1735590814658,
+      "tag": "0001_dusty_scourge",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1735591678305,
+      "tag": "0002_deep_lord_tyger",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1735639925777,
+      "tag": "0003_nebulous_giant_man",
+      "breakpoints": true
+    }
+  ]
+}
+ File path: ./drizzle/meta/0000_snapshot.json 
+ 
+{
+  "id": "e36e5be4-aa9d-43f6-a07a-b10b97f285b0",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.users": {
+      "name": "users",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "users_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "username": {
+          "name": "username",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "users_email_unique": {
+          "name": "users_email_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "email"
+          ]
+        },
+        "users_username_unique": {
+          "name": "users_username_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "username"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.refresh_tokens": {
+      "name": "refresh_tokens",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "refresh_tokens_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token": {
+          "name": "token",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "revoked": {
+          "name": "revoked",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "token_idx": {
+          "name": "token_idx",
+          "columns": [
+            {
+              "expression": "token",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "refresh_tokens_user_id_users_id_fk": {
+          "name": "refresh_tokens_user_id_users_id_fk",
+          "tableFrom": "refresh_tokens",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "refresh_tokens_token_unique": {
+          "name": "refresh_tokens_token_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "token"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
+ File path: ./.eslintrc.js 
+ 
+module.exports = {
+  parser: '@typescript-eslint/parser',
+  parserOptions: {
+    project: 'tsconfig.json',
+    tsconfigRootDir: __dirname,
+    sourceType: 'module',
+  },
+  plugins: ['@typescript-eslint/eslint-plugin'],
+  extends: [
+    'plugin:@typescript-eslint/recommended',
+    'plugin:prettier/recommended',
+  ],
+  root: true,
+  env: {
+    node: true,
+    jest: true,
+  },
+  ignorePatterns: ['.eslintrc.js'],
+  rules: {
+    '@typescript-eslint/interface-name-prefix': 'off',
+    '@typescript-eslint/explicit-function-return-type': 'off',
+    '@typescript-eslint/explicit-module-boundary-types': 'off',
+    '@typescript-eslint/no-explicit-any': 'off',
+  },
+};
+
+ File path: ./.prettierrc 
+ 
+{
+  "singleQuote": true,
+  "trailingComma": "all"
+}
